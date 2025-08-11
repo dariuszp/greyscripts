@@ -6,6 +6,10 @@ import_code("/home/madman/src/tools/get_open_ports.src")
 import_code("/home/madman/src/tools/log.src")
 import_code("/home/madman/src/tools/scan.src")
 
+if params.len != 4 then
+	exit("Usage: pwn [ip] [port] [mem_address] [exploit_value]")
+end if
+
 ip = params[0]
 port = params[1].val
 mem_address = params[2]
@@ -15,10 +19,6 @@ exploit_value = params[3]
 metaxploit = include_lib(current_path + "/metaxploit.so")
 if not metaxploit then metaxploit = include_lib("/lib/metaxploit.so")
 if not metaxploit then exit("get_service_exploits.src: Unable to locate metaxploit.so")
-
-if params.len != 4 then
-	exit("Usage: pwn [ip] [port] [mem_address] [exploit_value]")
-end if
 
 // Initial variables
 report_dir = home_dir
@@ -40,21 +40,12 @@ if not net then exit("Unable to connect")
 lib = net.dump_lib()
 if not lib then exit("Unable to connect")
 
-result = lib.overflow(mem_address, exploit_value)
-if not result then 
-    result = lib.overflow(mem_address, exploit_value, "pass")
-    if result == 1 then print "New password: pass"
-end if
+result = lib.overflow(mem_address, exploit_value, "pass")
+if result == 1 then print "New password: pass"
+if not result then result = lib.overflow(mem_address, exploit_value)
 if not result then exit("No result")
 
 print("Finished")
-files = ""
-// In case of shell or computer, we want all files
-if typeof(result) == "computer" or typeof(result) == "shell" then
-	print("COMPUTER/SHELL FILES LOGGED")
-    files = log_files(result)
-end if
-
 // In case of file, we want root dir and we want all files
 if typeof(result) == "file" then
 	print("FILE: " + result.path)
@@ -64,24 +55,21 @@ if typeof(result) == "file" then
 	end while
 	
 	files = log_files(current, "")
-end if
-
-if files then
+else if typeof(result) == "computer" then
+	print("COMPUTER:")
     content = ""
+	files = log_computer(result)
     for item in files
         content = content + "===== " + item.path + char(10)
         content = content + item.content + char(10) + char(10)
     end for
     file.set_content(content)
 	print(content)
-end if
-
-if typeof(result) == "shell" then
+else if typeof(result) == "shell" then
 	print("SHELL:")
 	result.start_terminal
-end if
-
-if result != 1 and typeof(result) != "computer" and typeof(result) != "shell" and typeof(result) != "file" then
+else if result != 1 then
+	print("UNKNOWN:")
     print(typeof(result))
     dump(result)
 end if
