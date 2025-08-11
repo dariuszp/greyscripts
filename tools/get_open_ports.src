@@ -1,0 +1,14 @@
+// get_open_ports.src
+
+// Get all ports open on target machine
+get_open_ports = function(ip)
+	router = get_router(ip);
+	ports = router.used_ports()
+	open_ports = []
+	for port in ports
+		if port.is_closed == 0 then
+			open_ports.push(port.port_number)
+		end if
+	end for
+	return open_ports
+end function

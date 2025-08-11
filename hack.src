@@ -1,0 +1,89 @@
+// pwn.src
+
+import_code("/home/madman/src/tools/dump.src")
+import_code("/home/madman/src/tools/cache.src")
+import_code("/home/madman/src/tools/get_open_ports.src")
+import_code("/home/madman/src/tools/log.src")
+import_code("/home/madman/src/tools/scan.src")
+
+ip = params[0]
+port = params[1].val
+mem_address = params[2]
+exploit_value = params[3]
+
+// libs
+metaxploit = include_lib(current_path + "/metaxploit.so")
+if not metaxploit then metaxploit = include_lib("/lib/metaxploit.so")
+if not metaxploit then exit("get_service_exploits.src: Unable to locate metaxploit.so")
+
+if params.len != 4 then
+	exit("Usage: pwn [ip] [port] [mem_address] [exploit_value]")
+end if
+
+// Initial variables
+report_dir = home_dir
+report_filename = "hack.txt"
+report_path = report_dir + "/" + report_filename
+
+// Ensure report file
+computer = get_shell().host_computer
+file = computer.File(report_path)
+error = ""
+if not file then error = computer.touch(report_dir, report_filename)
+if error and error != 1 then exit("Error while creating " + report_path + ": " + error)
+file = computer.File(report_path)
+if not file then exit("Unable to access " + report_path)
+
+net = metaxploit.net_use(ip, port)
+if not net then exit("Unable to connect")
+
+lib = net.dump_lib()
+if not lib then exit("Unable to connect")
+
+result = lib.overflow(mem_address, exploit_value)
+if not result then 
+    result = lib.overflow(mem_address, exploit_value, "pass")
+    if result == 1 then print "New password: pass"
+end if
+if not result then exit("No result")
+
+print("Finished")
+files = ""
+// In case of shell or computer, we want all files
+if typeof(result) == "computer" or typeof(result) == "shell" then
+	print("COMPUTER/SHELL FILES LOGGED")
+    files = log_files(result)
+end if
+
+// In case of file, we want root dir and we want all files
+if typeof(result) == "file" then
+	print("FILE: " + result.path)
+	current = result
+	while current.parent
+		current = current.parent
+	end while
+	
+	files = log_files(current, "")
+end if
+
+if files then
+    content = ""
+    for item in files
+        content = content + "===== " + item.path + char(10)
+        content = content + item.content + char(10) + char(10)
+    end for
+    file.set_content(content)
+	print(content)
+end if
+
+if typeof(result) == "shell" then
+	print("SHELL:")
+	result.start_terminal
+end if
+
+if result != 1 and typeof(result) != "computer" and typeof(result) != "shell" and typeof(result) != "file" then
+    print(typeof(result))
+    dump(result)
+end if
+
+print ("Thank you!")	

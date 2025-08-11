@@ -1,0 +1,31 @@
+// Log everything in that location and its children
+log_files = function (dir, result)
+    if not dir then exit("No dir in log_files")
+
+    if not result then result = []
+
+	files = dir.get_files
+	folders = dir.get_folders
+	
+	for file in files
+		if not file.is_binary and not file.is_symlink and file.has_permission("r") and file.get_content then
+		    entry = { "path": file.path, "content": file.get_content }
+			result.push(entry)
+		end if
+	end for
+
+	for folder in folders
+		result = log_files(folder, result)
+	end for
+
+	return result
+end function
+
+// Iterate entire computer and log all files
+log_computer = function(computer)
+    if not computer then exit("No computer in log_computer")
+
+	dir = computer.File("/")
+	result = log_files(dir)
+	return result
+end function

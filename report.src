@@ -1,0 +1,59 @@
+// report.src
+import_code("/home/madman/src/tools/dump.src")
+import_code("/home/madman/src/tools/cache.src")
+import_code("/home/madman/src/tools/get_open_ports.src")
+import_code("/home/madman/src/tools/log.src")
+import_code("/home/madman/src/tools/scan.src")
+
+// Arguments
+ip = params[0]
+// Initial variables
+report_dir = home_dir + "/reports"
+report_filename = ip + ".txt"
+report_path = report_dir + "/" + report_filename
+
+// Ensure report file
+computer = get_shell().host_computer
+file = computer.File(report_path)
+if not file then error = computer.touch(report_dir, report_filename)
+if error and error != 1 then exit("Error while creating " + report_filename + ": " + error)
+file = computer.File(report_path)
+if not file then exit("Unable to access " + report_path)
+
+// Ensure we have all addresses cached
+scan_remote(ip)
+
+report = []
+ports = get_open_ports(ip)
+for port in ports
+	net = metaxploit.net_use(ip, port)
+	lib = net.dump_lib()
+	key = scan_get_lib_key(lib)
+	addresses = read_cache(key)
+	for address in addresses
+		exploits = scan_remote_mem_address(ip, port, address)
+		for exploit in exploits
+			report.push(exploit)
+		end for
+	end for
+end for
+report.sort("root", 0)
+
+str = ""
+for exploit in report
+    str = str + "CMD: hack " + exploit.ip + " " + exploit.port+ " " + exploit.mem_address+ " " + exploit.exploit + char(10)
+	str = str + "IP: " + exploit.ip + char(10)
+	str = str + "PORT: " + exploit.port + char(10)
+	str = str + "MEM: " + exploit.mem_address + char(10)
+	str = str + "EXPLOIT: " + exploit.exploit + char(10)
+	str = str + "ROOT: " + exploit.root + char(10)
+	str = str + "INFO: " + exploit.info + char(10)
+	str = str + "REQS:" + char(10)
+	for req in exploit.reqs
+		str = str + "  " + req + char(10)
+	end for
+	str = str + char(10) + char(10)
+end for
+
+file.set_content(str)
+print("Thank you!")

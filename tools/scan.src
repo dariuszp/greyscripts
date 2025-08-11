@@ -1,0 +1,119 @@
+// scan.src
+// require cache.src
+// require get_open_ports.src
+
+// We often just need it
+metaxploit = include_lib(current_path + "/metaxploit.so")
+if not metaxploit then metaxploit = include_lib("/lib/metaxploit.so")
+if not metaxploit then exit("get_service_exploits.src: Unable to locate metaxploit.so")
+
+
+// Cache lib key combine name and version to ensure we have unique name per lib
+scan_get_lib_key = function (lib)
+    if not lib then exit("Missing lib in scan_get_lib_key")
+    return lib.lib_name.split("\.")[0] + lib.version
+end function
+
+
+// NOT TESTED - scan local libs
+scan_local = function (shell, login, pass)
+    if not shell or not login or not pass then exit("Missing ip, login or pass in scan_local")
+
+	folder = shell.host_computer.File("/lib")
+	for file in folder.get_files
+   		lib = metaxploit.load(file.path)
+		key = scan_get_lib_key(lib)
+		
+		cached = cache_read(key, lib)
+		if cached.len == 0 then
+			debugLib = lib.debug_tools(login, pass)
+			cache_write(lib, debugLib.scan)
+		end if
+	end for
+end function
+
+
+// Scan remote libs
+scan_remote = function(ip)
+    if not ip then exit("Missing ip in scan_remote")
+
+	ports = get_open_ports(ip)
+	for port in ports
+		net = metaxploit.net_use(ip, port)
+		lib = net.dump_lib()
+		key = scan_get_lib_key(lib)
+		
+		fromCache = cache_read(key)
+		
+		print("Scanning " + lib.lib_name + " " + lib.version)
+		if fromCache.len == 0 then
+			result = metaxploit.scan(lib)
+			cache_write(key, result)
+		else 
+			print(" * " + lib.lib_name + " " + lib.version + " already cached")	
+		end if
+	end for
+end function
+
+
+
+//Tries to log all exploits into file
+//{ 
+//    "ip": string, 
+//    "port": number, 
+//    "mem_address": string, 
+//    "info": string, 
+//    "exploit": string, 
+//    "reqs": string[], 
+//    "root": 1/0 
+//}[]
+scan_remote_mem_address = function(ip, port, address)
+    result = []
+
+    if not ip or not port or not address then exit("Missing ip, port or memory address in scan_address")
+    if typeof(port) != "number" then port = port.to_int
+
+    // Can fail if port is not a number
+    net = metaxploit.net_use(ip, port)
+	if not net then return result
+
+    lib = net.dump_lib()
+    if not lib then return result
+
+    scan = metaxploit.scan_address(lib, address)
+    if not scan then return result
+
+    // Split sections
+    sections = scan.trim().split("\n\n")
+	// Strip first two lines
+	sections.pull()
+	sections.pull()
+    for section in sections
+    	// Get all lines
+    	lines = section.split("\n")
+    	if lines.len == 0 then continue
+    	info = lines.pull()
+
+    	matches = info.matches("([^\s]+)\. Buffer overflow\.")
+    	value = matches.values().pull()
+
+    	if not value then continue
+
+    	exploit = value.split("\.").pull()
+    	if not exploit then continue
+		exploit = exploit.replace("<b>", "")
+		exploit = exploit.replace("</b>", "")
+
+    	root = 0
+    	for line in lines
+    		if line.is_match("root") then
+    			root = 1
+    			break
+    		end if
+    	end for
+    	data = { "ip": ip, "port": port, "mem_address": address, "info": info, "exploit": exploit, "reqs": lines, "root": root }
+    	result.push(data)
+	end for
+	result.sort("root", 0)
+	return result
+end function

@@ -1,0 +1,26 @@
+// dump.src
+
+// Print variable content
+dump = function(var)
+    print("==== DUMP ====")
+	print("  TYPE: " + typeof(var))
+	if var isa list then
+	    for item in var
+	        print("    - " + item)
+	    end for
+	else if var isa map then
+		if var.hasIndex("classID") then
+	    	print("  PROPERTIES OF " + var.classID + ": ")
+	    	for item in var.__isa
+	        	print("    - " + item.key)
+        	end for
+		else
+			for item in var
+				print("    - " + item)
+			end for
+		end if
+	else
+        print("  VALUE: " + var)
+	end if
+    print("==== END DUMP ====")
+end function

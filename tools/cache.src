@@ -1,0 +1,49 @@
+// cache.src
+
+// Ensure we have cache file
+cache_file = function (key)
+    if not key then exit("Missing key in cache_file")
+
+	computer = get_shell.host_computer
+
+    cacheDir = home_dir + "/cache"
+	filename = key + ".txt"
+	path = cacheDir + "/" + filename
+    
+    file = computer.File(path)
+	
+	error = ""
+    if not file then error = computer.touch(cacheDir, filename)
+    if error and error != 1 then exit("Error while creating " + filename + ": " + error)
+	
+	file = computer.File(path)
+	if not file then exit("Unable to create " + filename + " in " + cacheDir)
+    return file
+end function
+
+// Read cache file
+cache_read = function(key)
+    if not key then exit("Missing key in cache_file")
+
+    file = cache_file(key)
+    content = file.get_content.trim()
+	if content.len == 0 then return []
+    return content.split(char(10))
+end function
+
+// Write cache file
+cache_write = function(key, list)
+    if not key then exit("Missing key in cache_file")
+	
+    computer = get_shell.host_computer
+	file = cache_file(key)
+	
+    content = list.join(char(10)).trim()
+    result = file.set_content(content)
+	if typeof(result) == "string" then
+    	exit("There was an error while setting file content: " + result)
+ 	else if result == 0 then
+   		exit("Unable to set content of file!")
+	end if
+	return list
+end function
